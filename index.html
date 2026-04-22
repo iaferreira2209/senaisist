@@ -785,8 +785,11 @@
         <div class="prof-auth-box">
             <div class="prof-auth-icon">🔐</div>
             <h3>Acesso Restrito</h3>
-            <p>Esta ação é exclusiva para professores.<br>Digite a senha para continuar.</p>
+            <p id="profAuthDesc">Esta ação é exclusiva para professores.<br>Digite a senha para continuar.</p>
             <input type="password" class="prof-auth-input" id="profAuthPassword" placeholder="Senha do professor">
+            <div id="profAuthNameGroup" style="display:none;">
+                <input type="text" class="prof-auth-input" id="profAuthName" placeholder="Seu nome completo" style="letter-spacing: normal; margin-top: 0;">
+            </div>
             <div class="prof-auth-error" id="profAuthError">Senha incorreta. Tente novamente.</div>
             <div class="prof-auth-actions">
                 <button class="btn-auth-cancel" id="btnAuthCancel">Cancelar</button>
@@ -1037,11 +1040,29 @@
         var btnAuthConfirm = document.getElementById('btnAuthConfirm');
         var pendingAuthAction = null; // guarda a função a executar após autenticação
 
-        function requireProfAuth(actionFn) {
+        var profAuthRequiresName = false;
+
+        function requireProfAuth(actionFn, requireName) {
             pendingAuthAction = actionFn;
+            profAuthRequiresName = !!requireName;
             profAuthPassword.value = '';
             profAuthPassword.classList.remove('error');
             profAuthError.classList.remove('visible');
+
+            var nameGroup = document.getElementById('profAuthNameGroup');
+            var nameInput = document.getElementById('profAuthName');
+            var desc = document.getElementById('profAuthDesc');
+
+            if (requireName) {
+                nameGroup.style.display = 'block';
+                nameInput.value = '';
+                nameInput.style.borderColor = '';
+                desc.innerHTML = 'Esta ação é exclusiva para professores.<br>Digite a senha e seu nome para continuar.';
+            } else {
+                nameGroup.style.display = 'none';
+                desc.innerHTML = 'Esta ação é exclusiva para professores.<br>Digite a senha para continuar.';
+            }
+
             profAuthOverlay.classList.add('active');
             setTimeout(function() { profAuthPassword.focus(); }, 100);
         }
@@ -1061,9 +1082,18 @@
         btnAuthConfirm.onclick = function() {
             var pwd = profAuthPassword.value;
             if (pwd === PROF_PASSWORD) {
+                if (profAuthRequiresName) {
+                    var nameInput = document.getElementById('profAuthName');
+                    if (!nameInput.value.trim()) {
+                        nameInput.style.borderColor = '#ef4444';
+                        nameInput.focus();
+                        return;
+                    }
+                }
+                var professorName = profAuthRequiresName ? document.getElementById('profAuthName').value.trim() : null;
                 profAuthOverlay.classList.remove('active');
                 if (pendingAuthAction) {
-                    pendingAuthAction();
+                    pendingAuthAction(professorName);
                     pendingAuthAction = null;
                 }
             } else {
@@ -1293,14 +1323,14 @@
         }
 
         window.acceptOrder = function(orderId) {
-            requireProfAuth(async function() {
+            requireProfAuth(async function(professorName) {
                 await updateOrder(orderId, {
                     status: 'accepted',
-                    accepted_by: 'Professor'
+                    accepted_by: professorName
                 });
                 var tabs = document.querySelectorAll('.tab');
                 tabs[1].click();
-            });
+            }, true);
         };
 
         window.completeOrder = function(orderId) {
